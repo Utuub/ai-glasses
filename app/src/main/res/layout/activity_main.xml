@@ -7,12 +7,20 @@
     android:orientation="vertical"
     android:padding="16dp">
 
+    <TextView
+        android:id="@+id/voiceView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Voice starting..."
+        android:textColor="#03A9F4"
+        android:textSize="20sp" />
+
     <EditText
         android:id="@+id/questionInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:focusable="true"
-        android:hint="Type a question or a Slack message"
+        android:hint="Say &quot;record message&quot; or type here"
         android:imeOptions="actionSend|flagNoExtractUi"
         android:inputType="text"
         android:textColor="#FFFFFF"

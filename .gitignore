@@ -16,3 +16,6 @@ local.properties
 
 .kotlin
 .idea/
+
+# Vosk model, downloaded by the build
+/app/src/main/assets/model-en-us/
