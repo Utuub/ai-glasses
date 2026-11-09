@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { VoiceBus.status.collect { voiceView.text = "🎤 $it" } }
+                launch { VoiceBus.status.collect { voiceView.text = "ðŸŽ¤ $it" } }
                 launch { VoiceBus.eventFlow.collect { onVoice(it) } }
             }
         }
@@ -154,7 +154,7 @@ class MainActivity : AppCompatActivity() {
             val ok = SlackClient.send(text)
             Log.i(TAG, "Slack ok=$ok in ${SystemClock.elapsedRealtime() - start} ms")
             if (ok) {
-                status("✓ Sent to Slack")
+                status("âœ“ Sent to Slack")
                 speak("Sent to Slack")
                 questionInput.text.clear()
             } else {
@@ -164,14 +164,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Push-to-talk: hold the ` key (left of 1), talk, let go. Caught here before the text box sees it.
+    // Push-to-talk toggle: press ` (left of 1) to start talking, press again to stop. Caught here before the text box sees it.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == PTT_KEY) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 tts?.stop()
-                VoiceBus.service?.pttDown()
-            } else if (event.action == KeyEvent.ACTION_UP) {
-                VoiceBus.service?.pttUp()
+                VoiceBus.service?.pttToggle()
             }
             return true
         }

@@ -28,7 +28,7 @@ The app runs on Android-based smart glasses (Vuzix LX1). A question goes to Clau
 | "open app" / "open glasses" | Brings the app back |
 | "cancel" | Stops the answer being read aloud |
 
-**Push-to-talk:** hold the `` ` `` key, talk, let go. A command phrase runs that command; anything else goes into the message box. Each press opens a fresh mic, so it works even when always-on listening is having trouble.
+**Push-to-talk:** press the `` ` `` key, talk, press it again (auto-stops after 30 s). A command phrase runs that command; anything else goes into the message box. Each press opens a fresh mic, so it works even when always-on listening is having trouble.
 
 Listening runs in a background service, so commands work after leaving the app. Bringing the app back from the home screen needs the "Display over other apps" permission (`adb shell appops set com.example.vuzixem SYSTEM_ALERT_WINDOW allow`). The speech model (~40 MB) downloads into `app/src/main/assets/model-en-us/` on the first build.
 

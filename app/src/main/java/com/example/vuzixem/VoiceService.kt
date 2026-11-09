@@ -59,6 +59,8 @@ class VoiceService : Service(), RecognitionListener {
     private var speech: SpeechService? = null
     private var mode = Mode.COMMAND
     private var paused = false
+    /** Set only after the user ends push-to-talk, so a late final result from the old listener is ignored. */
+    private var pttStopping = false
 
     // Dictation state
     private var thenAsk = false
@@ -133,19 +135,32 @@ class VoiceService : Service(), RecognitionListener {
      * Push-to-talk: key held down. Opens a fresh mic + free-speech recognizer. On release, a
      * command phrase runs that command; anything else becomes the message in the box.
      */
+    val pttOn get() = mode == Mode.PTT
+
+    /** Toggle: first press starts talking, second press stops. */
+    fun pttToggle() = if (pttOn) pttUp() else pttDown()
+
     fun pttDown() {
         val m = model ?: return
         main.removeCallbacks(dictationTick)
         stopSpeech()
         mode = Mode.PTT
+        pttStopping = false
         paused = false
         dictated.clear(); lastPartial = ""
         speech = SpeechService(Recognizer(m, RATE), RATE).also { it.startListening(this) }
-        VoiceBus.status.value = "Talking... let go when done"
+        VoiceBus.status.value = "Talking... press ` again when done"
+        // Safety net in case the second press never comes.
+        main.postDelayed(pttTimeout, MAX_DICTATION_MS)
     }
+
+    private val pttTimeout = Runnable { pttUp() }
 
     fun pttUp() {
         if (mode != Mode.PTT) return
+        main.removeCallbacks(pttTimeout)
+        if (pttStopping) return
+        pttStopping = true
         VoiceBus.status.value = "Got it, thinking..."
         // Small tail so the last word isn't cut off; stop() then delivers onFinalResult.
         main.postDelayed({ if (mode == Mode.PTT) speech?.stop() }, PTT_TAIL_MS)
@@ -213,7 +228,8 @@ class VoiceService : Service(), RecognitionListener {
     }
 
     override fun onFinalResult(hypothesis: String) {
-        if (mode != Mode.PTT) return
+        if (mode != Mode.PTT || !pttStopping) return
+        pttStopping = false
         val text = JSONObject(hypothesis).optString("text").trim()
         if (text.isNotEmpty()) {
             if (dictated.isNotEmpty()) dictated.append(' ')

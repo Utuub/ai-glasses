@@ -20,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:focusable="true"
-        android:hint="Hold ` to talk, or say &quot;record message&quot;"
+        android:hint="Press ` to talk, or say &quot;record message&quot;"
         android:imeOptions="actionSend|flagNoExtractUi"
         android:inputType="text"
         android:textColor="#FFFFFF"
