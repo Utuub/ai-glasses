@@ -52,7 +52,7 @@ object VoiceBus {
  */
 class VoiceService : Service(), RecognitionListener {
 
-    private enum class Mode { COMMAND, DICTATE }
+    private enum class Mode { COMMAND, DICTATE, PTT }
 
     private val main = Handler(Looper.getMainLooper())
     private var model: Model? = null
@@ -86,7 +86,10 @@ class VoiceService : Service(), RecognitionListener {
     private val fakeSpeech = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             val text = i.getStringExtra("text")?.trim()?.lowercase() ?: return
-            if (mode == Mode.DICTATE) {
+            if (mode == Mode.PTT) {
+                if (dictated.isNotEmpty()) dictated.append(' ')
+                dictated.append(text)
+            } else if (mode == Mode.DICTATE) {
                 dictated.append(text); lastSpeechAt = SystemClock.elapsedRealtime() - SILENCE_MS
             } else onResult(JSONObject().put("text", PHRASES.keys.firstOrNull { it == text } ?: "[unk]").toString())
         }
@@ -126,6 +129,44 @@ class VoiceService : Service(), RecognitionListener {
         main.postDelayed(dictationTick, 250)
     }
 
+    /**
+     * Push-to-talk: key held down. Opens a fresh mic + free-speech recognizer. On release, a
+     * command phrase runs that command; anything else becomes the message in the box.
+     */
+    fun pttDown() {
+        val m = model ?: return
+        main.removeCallbacks(dictationTick)
+        stopSpeech()
+        mode = Mode.PTT
+        paused = false
+        dictated.clear(); lastPartial = ""
+        speech = SpeechService(Recognizer(m, RATE), RATE).also { it.startListening(this) }
+        VoiceBus.status.value = "Talking... let go when done"
+    }
+
+    fun pttUp() {
+        if (mode != Mode.PTT) return
+        VoiceBus.status.value = "Got it, thinking..."
+        // Small tail so the last word isn't cut off; stop() then delivers onFinalResult.
+        main.postDelayed({ if (mode == Mode.PTT) speech?.stop() }, PTT_TAIL_MS)
+    }
+
+    private fun finishPtt() {
+        val text = (dictated.toString() + " " + lastPartial).replace("[unk]", "").trim().lowercase()
+            .replace(Regex("\\s+"), " ")
+        listenForCommands()
+        Log.i(TAG, "Push-to-talk heard \"$text\"")
+        if (text.isEmpty()) { VoiceBus.status.value = "Didn't hear anything"; return }
+        val cmd = PHRASES[text] ?: PHRASES[text.replace("cloud", "claude").replace("clod", "claude")]
+        if (cmd != null) {
+            VoiceBus.status.value = "Heard: \"$text\""
+            handle(cmd)
+        } else {
+            VoiceBus.status.value = LISTENING
+            deliver(VoiceEvent.Dictated(text.replaceFirstChar { it.uppercase() }, false))
+        }
+    }
+
     // ---- Recognition ----
 
     private fun listenForCommands() {
@@ -145,7 +186,7 @@ class VoiceService : Service(), RecognitionListener {
 
     override fun onResult(hypothesis: String) {
         val text = JSONObject(hypothesis).optString("text").trim()
-        if (mode == Mode.DICTATE) {
+        if (mode == Mode.DICTATE || mode == Mode.PTT) {
             if (text.isNotEmpty()) {
                 if (dictated.isNotEmpty()) dictated.append(' ')
                 dictated.append(text)
@@ -162,7 +203,7 @@ class VoiceService : Service(), RecognitionListener {
     }
 
     override fun onPartialResult(hypothesis: String) {
-        if (mode != Mode.DICTATE) return
+        if (mode == Mode.COMMAND) return
         val p = JSONObject(hypothesis).optString("partial").trim()
         if (p.isNotEmpty() && p != lastPartial) {
             lastPartial = p
@@ -171,7 +212,16 @@ class VoiceService : Service(), RecognitionListener {
         }
     }
 
-    override fun onFinalResult(hypothesis: String) {}
+    override fun onFinalResult(hypothesis: String) {
+        if (mode != Mode.PTT) return
+        val text = JSONObject(hypothesis).optString("text").trim()
+        if (text.isNotEmpty()) {
+            if (dictated.isNotEmpty()) dictated.append(' ')
+            dictated.append(text)
+            lastPartial = ""
+        }
+        finishPtt()
+    }
     override fun onError(e: Exception) { Log.e(TAG, "Recognizer error", e) }
     override fun onTimeout() {}
 
@@ -247,6 +297,7 @@ class VoiceService : Service(), RecognitionListener {
         private const val RATE = 16000.0f
         private const val LISTENING = "Listening..."
         private const val SILENCE_MS = 1500L
+        private const val PTT_TAIL_MS = 300L
         private const val NO_SPEECH_MS = 8000L
         private const val MAX_DICTATION_MS = 30000L
 

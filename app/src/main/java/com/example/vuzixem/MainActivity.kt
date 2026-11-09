@@ -164,6 +164,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Push-to-talk: hold the ` key (left of 1), talk, let go. Caught here before the text box sees it.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == PTT_KEY) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                tts?.stop()
+                VoiceBus.service?.pttDown()
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                VoiceBus.service?.pttUp()
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     // Button-only shortcut (the LX1 profile has no touchscreen): Menu key = send the box's text to Slack.
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = when (keyCode) {
         KeyEvent.KEYCODE_MENU -> { sendToSlack(questionInput.text.toString()); true }
@@ -184,5 +198,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "AIGlasses"
         private const val REQ_PERMS = 1
+        private const val PTT_KEY = KeyEvent.KEYCODE_GRAVE
     }
 }
