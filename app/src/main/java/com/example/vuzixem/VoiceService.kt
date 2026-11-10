@@ -172,7 +172,7 @@ class VoiceService : Service(), RecognitionListener {
         listenForCommands()
         Log.i(TAG, "Push-to-talk heard \"$text\"")
         if (text.isEmpty()) { VoiceBus.status.value = "Didn't hear anything"; return }
-        val cmd = PHRASES[text] ?: PHRASES[text.replace("cloud", "claude").replace("clod", "claude")]
+        val cmd = matchCommand(text)
         if (cmd != null) {
             VoiceBus.status.value = "Heard: \"$text\""
             handle(cmd)
@@ -182,7 +182,19 @@ class VoiceService : Service(), RecognitionListener {
         }
     }
 
-    // ---- Recognition ----
+    /**
+     * Command phrase in a short utterance, allowing up to 2 stray words around it
+     * (room noise often adds "or", "the"). Longer speech is a message, not a command.
+     */
+    private fun matchCommand(raw: String): Cmd? {
+        val text = raw.replace("cloud", "claude").replace("clod", "claude")
+        val words = text.split(' ').size
+        return PHRASES.entries.firstOrNull { (phrase, _) ->
+            " $text ".contains(" $phrase ") && words <= phrase.split(' ').size + 2
+        }?.value
+    }
+
+        // ---- Recognition ----
 
     private fun listenForCommands() {
         val m = model ?: return
